@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
+import '../widgets/right_drawer.dart';
+import '../widgets/user_drawer.dart';
 import 'app_bar.dart';
-import 'right_drawer.dart';
-import 'user_drawer.dart';
 
 class DeviceInfoPage extends StatelessWidget {
   @override

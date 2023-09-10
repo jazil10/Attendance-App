@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'Loginpage.dart';
-import 'landing_page.dart';
+import 'screens/Loginpage.dart';
+import 'screens/landing_page.dart';
 
 void main() {
   runApp(SmartHCMApp());

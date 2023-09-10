@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'user_profile.dart'; // Import the user profile page
-import 'device_information.dart'; // Import the device information page
+import '../screens/device_information.dart';
+import '../screens/user_profile.dart';
 
 Drawer buildRightDrawer(BuildContext context) {
   // Replace this with the user's profile photo or initials
@@ -66,6 +66,8 @@ Drawer buildRightDrawer(BuildContext context) {
           title: Text('Profile'),
           leading: Icon(Icons.person),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Navigate to the user profile page
             Navigator.push(
               context,
@@ -77,6 +79,8 @@ Drawer buildRightDrawer(BuildContext context) {
           title: Text('Device Information'),
           leading: Icon(Icons.device_hub),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Navigate to the device information page
             Navigator.push(
               context,
@@ -88,6 +92,8 @@ Drawer buildRightDrawer(BuildContext context) {
           title: Text('Settings'),
           leading: Icon(Icons.settings),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Handle settings option
           },
         ),
@@ -95,6 +101,8 @@ Drawer buildRightDrawer(BuildContext context) {
           title: Text('Logout'),
           leading: Icon(Icons.exit_to_app),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Handle logout option
           },
         ),

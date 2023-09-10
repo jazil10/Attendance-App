@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'landing_page.dart'; // Import the landing page
+import '../screens/landing_page.dart';
 
 Drawer buildUserDrawer(BuildContext context) {
   return Drawer(
@@ -10,8 +10,7 @@ Drawer buildUserDrawer(BuildContext context) {
           width: 320,
           height: 120, // Adjust the height as needed
           decoration: BoxDecoration(
-            color:
-                Color.fromARGB(255, 87, 82, 82), // Light grey background color
+            color: Color.fromARGB(255, 87, 82, 82), // Light grey background color
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -50,17 +49,21 @@ Drawer buildUserDrawer(BuildContext context) {
           title: Text('Home'),
           leading: Icon(Icons.home),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Navigate to the landing page
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => LandingPage()),
-            );
+            // Navigator.push(
+            //   context,
+            //   MaterialPageRoute(builder: (context) => LandingPage()),
+            // );
           },
         ),
         ListTile(
           title: Text('Tracking'),
           leading: Icon(Icons.location_pin),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Handle device information option
           },
         ),
@@ -68,6 +71,8 @@ Drawer buildUserDrawer(BuildContext context) {
           title: Text('About'),
           leading: Icon(Icons.edit_document),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Handle settings option
           },
         ),
@@ -75,6 +80,8 @@ Drawer buildUserDrawer(BuildContext context) {
           title: Text('Videos'),
           leading: Icon(Icons.videocam),
           onTap: () {
+            // Close the drawer
+            Navigator.pop(context);
             // Handle logout option
           },
         ),
