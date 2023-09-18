@@ -1,5 +1,6 @@
 import 'dart:collection';
 import 'dart:convert';
+import 'package:get_storage/get_storage.dart';
 import 'package:hcm/screens/Loginpage.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/material.dart';
@@ -16,15 +17,17 @@ import 'leave_page.dart';
 import 'package:connectivity/connectivity.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 class LandingPage extends StatefulWidget {
-  final Map<String, String> userData;
+    final Map<String, String>? userData; // Make it nullable by adding '?'
 
-  LandingPage({required this.userData});
+  LandingPage({this.userData}); // Make the parameter optional by removing 'required'
 
   @override
   _LandingPageState createState() => _LandingPageState();
 }
+
 
 class _LandingPageState extends State<LandingPage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -37,11 +40,15 @@ class _LandingPageState extends State<LandingPage> {
   final Queue<Function> apiCallQueue = Queue<Function>();
   bool isInternetConnected = false;
   List<Map<String, dynamic>> offlineResponses = [];
+  bool isCheckInEnabled = true;
+bool isCheckOutEnabled = false;
+
   
 
  @override
 void initState() {
   super.initState();
+    loadButtonStates();
   Connectivity().onConnectivityChanged.listen((result) {
     setState(() {
       connectivityResult = result;
@@ -57,6 +64,22 @@ void initState() {
     
     // Submit offline responses when connected
     submitOfflineResponses();
+  });
+}
+
+// Method to save button states to shared preferences
+void saveButtonStates() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('isCheckInEnabled', isCheckInEnabled);
+  await prefs.setBool('isCheckOutEnabled', isCheckOutEnabled);
+}
+
+// Method to load button states from shared preferences
+void loadButtonStates() async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  setState(() {
+    isCheckInEnabled = prefs.getBool('isCheckInEnabled') ?? true;
+    isCheckOutEnabled = prefs.getBool('isCheckOutEnabled') ?? false;
   });
 }
 
@@ -85,31 +108,92 @@ Future<String?> getEmployeeDesignationFromSP() async {
   return prefs.getString('employee_designation');
 }
 
+// Function to make a GET request to the API
+  Future<void> fetchEmployeeMappedLocation() async {
+    final String apiUrl = "http://iilhcm.ismailglobal.com/api/v1/employee-mapped-location";
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? token = prefs.getString('token');
+     
+    if (token == null) {
+      // Handle the case where the token is not available
+      Fluttertoast.showToast(msg: "Token not available, please Login.", backgroundColor: Colors.red);
+    }
 
-void logout(BuildContext context) async {
-  // Show a confirmation dialog
-  bool confirm = await showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Text("Confirm Logout"),
-        content: Text("Are you sure you want to logout?"),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(true); // User confirmed logout
-            },
-            child: Text("Yes"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(false); // User canceled logout
-            },
-            child: Text("No"),
-          ),
-        ],
+    try {
+      final http.Response response = await http.get(
+        Uri.parse(apiUrl),
+        headers: {
+         "Bearer-Token": "$token",
+        },
       );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        final bool status = jsonResponse['status'];
+        final String message = jsonResponse['message'];
+
+
+        if (status) {
+          final List<dynamic> data = jsonResponse['data'];
+          if (data.isNotEmpty) {
+            final String latitude = data[0]['location_latitude'];
+            final String longitude = data[0]['location_longitude'];
+           
+            // Store latitude and longitude in local storage
+            await prefs.setString('location_latitude', latitude);
+            await prefs.setString('location_longitude', longitude);
+
+            // Print the response and stored values
+            print("Response: $jsonResponse");
+            print("Latitude: $latitude");
+            print("Longitude: $longitude");
+                  Fluttertoast.showToast(msg: "$message \n latitude: ${latitude}, \n longitude: ${longitude}", toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.CENTER,
+            backgroundColor: Colors.green,
+            textColor: Colors.white,
+ );
+
+          }
+        } else {
+          print("Error: $message");
+              Fluttertoast.showToast(msg: "$message", toastLength: Toast.LENGTH_LONG,
+            gravity: ToastGravity.CENTER,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+);
+
+        }
+      } else {
+        print("HTTP Error: ${response.statusCode}");
+      }
+    } catch (error) {
+      print("Error: $error");
+    }
+  }
+
+
+void logout() async {
+  // Show a confirmation dialog
+  bool? confirm = await Get.defaultDialog<bool>(
+    title: "Confirm Logout",
+    content: Text("Are you sure you want to logout?"),
+    textCancel: "No",
+    textConfirm: "Yes",
+    buttonColor: Colors.blue,
+    cancelTextColor: Colors.black,
+    confirmTextColor: Colors.white,
+    onConfirm: () async {
+      // Remove the token from shared preferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+            final box = GetStorage();
+      await prefs.remove('token');
+      box.remove('employee_name');
+            box.remove('employee_designation');
+
+      // Navigate to the LoginPage
+      Get.offAll(LoginPage()); // Replace 'LoginPage' with your login route
     },
+    onCancel: () {},
   );
 
   if (confirm == true) {
@@ -119,14 +203,13 @@ void logout(BuildContext context) async {
       await prefs.remove('token');
 
       // Navigate to the LoginPage
-      Get.offAll(LoginPage()); // Replace '/login' with your login route
+      Get.offAll(LoginPage()); // Replace 'LoginPage' with your login route
     } catch (e) {
       // Handle any errors that may occur during logout
       print('Error during logout: $e');
     }
   }
 }
-
 
 
 
@@ -140,6 +223,13 @@ Future<void> FinalCheckIn() async {
       "formatted_date": DateTime.now().toLocal().toString().split('.').first,
     };
     saveOfflineResponse(offlineResponse);
+       setState(() {
+      isCheckInEnabled = false;
+      isCheckOutEnabled = true;
+    });
+
+    // Save button states to shared preferences
+    saveButtonStates();
     Get.snackbar(
       "Check-In",
       "Check-In response stored offline.",
@@ -177,6 +267,13 @@ Future<void> FinalCheckIn() async {
       );
 
       if (distanceInMeters <= 300) {
+         setState(() {
+      isCheckInEnabled = false;
+      isCheckOutEnabled = true;
+    });
+
+    // Save button states to shared preferences
+    saveButtonStates();
         MakeCheckInCall();
       } else {
         Get.snackbar(
@@ -212,10 +309,16 @@ Future<void> FinalCheckIn() async {
       "checkout": 1,
       "formatted_date": DateTime.now().toLocal().toString().split('.').first,
     });
+    setState(() {
+      isCheckInEnabled = true;
+      isCheckOutEnabled = false;
+    });
+        saveButtonStates();
+
     Get.snackbar(
       "Check-out",
       "Check-out response stored offline.",
-      backgroundColor: Colors.red,
+      backgroundColor: Colors.blue,
       colorText: Colors.white,
       duration: Duration(seconds: 1),
     );
@@ -249,6 +352,14 @@ Future<void> FinalCheckIn() async {
     );
 
     if (distanceInMeters <= 300) {
+      setState(() {
+      isCheckInEnabled = true;
+      isCheckOutEnabled = false;
+    });
+
+    // Save button states to shared preferences
+    saveButtonStates();
+
       checkOut();
     } else {
       Get.snackbar(
@@ -480,6 +591,8 @@ final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
 
        @override
   Widget build(BuildContext context) {
+        final box = GetStorage();
+        box.read('employee_name');
     return Scaffold(
        appBar: AppBar(
         backgroundColor: Colors.blue,
@@ -501,7 +614,7 @@ final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
           IconButton(
             icon: Icon(Icons.logout), // Logout icon
             onPressed: () {
-              logout(context);
+              logout();
               // Handle logout button tap
               // You can implement your logout logic here
             },
@@ -612,7 +725,7 @@ Column(
     // User Name
 Container(
   child: Text(
-    widget.userData['employee_name'] ?? "John Doe",
+    box.read('employee_name') ?? "John Doe",
     style: TextStyle(
       fontSize: 15,
       fontWeight: FontWeight.bold,
@@ -628,7 +741,7 @@ Container(
     // User Designation
     Container(
       child: Text(
-        widget.userData['employee_designation'] ?? "Associate General Manager", // Replace with user's designation
+              box.read('employee_designation') ?? "Associate General Manager",
         style: TextStyle(
           fontSize: 13,
                 fontWeight: FontWeight.w400,
@@ -670,6 +783,7 @@ Container(
                       ElevatedButton.icon(
   onPressed: () {
     // Handle Attendance Location button tap
+    fetchEmployeeMappedLocation();
   },
   icon: Icon(Icons.location_on),
   label: Text("Attendance Locations"),
@@ -692,7 +806,7 @@ Container(
   child: ClipRRect(
     borderRadius: BorderRadius.circular(15.0), // Adjust the border radius as needed
     child: Container(
-      color: const Color.fromARGB(255, 252, 251, 251).withOpacity(0.2), // Light grey background color
+      color: const Color.fromARGB(255, 252, 251, 251).withOpacity(0.1), // Light grey background color
       width: double.infinity, // Take up the whole screen width
       height: 90,
       child: Column(
@@ -710,9 +824,8 @@ Container(
             children: [
               // CheckIn Button
               ElevatedButton(
-                onPressed: () {
-FinalCheckIn();
-                },
+                  onPressed: isCheckInEnabled ? FinalCheckIn : null,
+
                 child: Text("CheckIn"),
                 style: ElevatedButton.styleFrom(
                   elevation: 2, // Adjust the elevation as needed
@@ -725,9 +838,8 @@ FinalCheckIn();
               ),
               // CheckOut Button
               ElevatedButton(
-                onPressed: () {
-                    FinalCheckOut();
-                },
+                  onPressed: isCheckOutEnabled ? FinalCheckOut : null,
+
                 child: Text("CheckOut"),
                 style: ElevatedButton.styleFrom(
                   primary: Colors.grey, // Blue color
@@ -767,20 +879,22 @@ FinalCheckIn();
 
 
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Calendar Icon and Date Range Text
                       Row(
                         children: [
                           Icon(Icons.calendar_today, color: Colors.white),
                           SizedBox(width: 5),
-                          Text(
-                            "From 26-08-2023 To 26-08-2023",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                            ),
-                          ),
+                          // Replace the static date with the "From current date to current date" format
+Text(
+  "From ${DateFormat('dd-MM-yyyy').format(DateTime.now())} to ${DateFormat('dd-MM-yyyy').format(DateTime.now())}",
+  style: TextStyle(
+    color: Colors.white,
+    fontSize: 16,
+  ),
+),
+
                         ],
                       ),
                       // Refresh Button
@@ -793,23 +907,23 @@ FinalCheckIn();
                     ],
                   ),
                   // Buttons Section 4 (Leave, Absent, Off Day, Deputation, Present, Leave)
-                 Container(
-  margin: EdgeInsets.only(top: 10),
+           Container(
+  margin: EdgeInsets.only(top: 5),
   child: ClipRRect(
-    borderRadius: BorderRadius.circular(15.0), // Adjust the border radius as needed
+    borderRadius: BorderRadius.circular(10.0), // Adjust the border radius as needed
     child: Container(
-      color: const Color.fromARGB(255, 252, 251, 251).withOpacity(0.4), // Light grey background color
-      width: 150,
+      color: const Color.fromARGB(255, 252, 251, 251).withOpacity(0.1), // Light grey background color
+      width: double.infinity,
+      margin: EdgeInsets.only(top: 10),
       child: Column(
         children: [
-                    SizedBox(height: 10), // Add spacing between rows
-
+          SizedBox(height: 10), // Add spacing between rows
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-                            SizedBox(width: 7),
+              SizedBox(width: 7),
               Expanded(
-                child: _buildRectangularButton("Leave", Icons.local_offer, () {
+                child: _buildRectangularButton("L O P", Icons.local_offer, () {
                   // Handle Leave button tap
                 }),
               ),
@@ -819,37 +933,32 @@ FinalCheckIn();
                   // Handle Absent button tap
                 }),
               ),
-                            SizedBox(width: 7),
-
+              SizedBox(width: 7),
               Expanded(
                 child: _buildRectangularButton("Off Day", Icons.calendar_today, () {
                   // Handle Off Day button tap
                 }),
               ),
-                            SizedBox(width: 7),
-
+               SizedBox(width: 7),
             ],
           ),
           SizedBox(height: 28), // Add spacing between rows
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-                            SizedBox(width: 6),
-
+              SizedBox(width: 6),
               Expanded(
                 child: _buildRectangularButton("Deputation", Icons.work, () {
                   // Handle Deputation button tap
                 }),
               ),
-                            SizedBox(width: 7),
-
+              SizedBox(width: 7),
               Expanded(
                 child: _buildRectangularButton("Present", Icons.check, () {
                   // Handle Present button tap
                 }),
               ),
-                            SizedBox(width: 7),
-
+              SizedBox(width: 7),
               Expanded(
                 child: _buildRectangularButton("Leave", Icons.local_offer, () {
                   // Handle Leave button tap (second one)
@@ -934,35 +1043,43 @@ FinalCheckIn();
   );
 }
 
+
 Widget _buildRectangularButton(String label, IconData iconData, Function onTap) {
   return ElevatedButton(
     onPressed: () {
       
     },
     style: ElevatedButton.styleFrom(
-      primary: Color.fromARGB(240, 185, 177, 177), // Button color
+      primary: Color.fromARGB(255, 180, 175, 175), // Gray background color
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(7.0), // Adjust the border radius as needed
+        borderRadius: BorderRadius.circular(20.0), // Adjust the border radius as needed
         side: BorderSide(color: Colors.blue, width: 2.0), // Blue border
       ),
       elevation: 2, // No elevation
-      // Adjust the minWidth property to accommodate the content
-      minimumSize: Size(0, 70), // Maintain the specified height
+      minimumSize: Size(160, 70), // Increase the button width and height
     ),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        Text(
-          label, // Relevant text
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 7,
+        Icon(
+          iconData,
+          color: Colors.white, // Blue icon color
+          size: 25, // Adjust the icon size as needed
+        ),
+        SizedBox(width: 2), // Add spacing between icon and text
+        Flexible(
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            softWrap: true,
+            style: TextStyle(
+              color: Colors.white, // Blue text color
+              fontWeight: FontWeight.w600,
+              fontSize: 11.5, // Adjust the text size as needed
+            ),
           ),
         ),
-                SizedBox(width: 5),
-                        Icon(iconData, color: Colors.white),
-
-
       ],
     ),
   );

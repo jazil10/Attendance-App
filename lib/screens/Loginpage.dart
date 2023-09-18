@@ -5,6 +5,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:roundcheckbox/roundcheckbox.dart';
@@ -88,7 +89,7 @@ class LoginPage extends StatelessWidget {
       deviceName = iosDeviceInfo.name; // iOS Device Name
     } else {
       final AndroidDeviceInfo androidDeviceInfo = await deviceInfoPlugin.androidInfo;
-      deviceToken = androidDeviceInfo.id; // Android Device ID
+      deviceToken = androidDeviceInfo.display; // Android Device ID
       deviceName = androidDeviceInfo.model; // Android Device Name
     }
   } catch (e) {
@@ -168,6 +169,15 @@ final String? employee_designation = jsonResponse["data"]?[0]?['designation_name
       'employee_designation': jsonResponse["data"]?[0]?['designation_name'],
 
     };
+
+     final box = GetStorage();
+  box.write('userId', jsonResponse['token']);
+  box.write('desiredLongitude', '67.086944917954');
+  box.write('desiredLatitude', '24.87009900430556');
+  box.write('radius', '100');
+  box.write('employee_name', jsonResponse["data"]?[0]?["employee_name"]);
+  box.write('employee_designation', jsonResponse["data"]?[0]?['designation_name']);
+print(box.read('employee_name'));
       loginController.setLoading(false);
 
     // Save user data locally if needed
@@ -306,10 +316,10 @@ Future<void> saveUserDataLocally(Map<String, String> userData) async {
               children: [
                 // Company Logo
                 Container(
-  width: 300,
-  height: 200, // Adjust the maximum height as needed
+  width: 350,
+  height: 250, // Adjust the maximum height as needed
   child: Image.asset(
-    'assets/images/ii.png',
+    'assets/images/iiil.png',
     fit: BoxFit.contain, // Ensure the image fits within the container
   ),
 ),
@@ -372,9 +382,11 @@ Future<void> saveUserDataLocally(Map<String, String> userData) async {
                       SizedBox(height: 30),
                       // Login Button
                       ElevatedButton(
-  onPressed: () {
-    login(context);
-  },
+  onPressed: loginController.isLoading.value
+      ? null // Disable the button if isLoading is true
+      : () {
+          login(context);
+        },
   style: ElevatedButton.styleFrom(
     primary: Colors.white, // Change the background color to white
     onPrimary: Colors.black,
@@ -435,7 +447,12 @@ class InputField extends StatelessWidget {
   final bool isPassword;
   final TextEditingController controller;
 
-  InputField({required this.icon, required this.hintText, this.isPassword = false, required this.controller});
+  InputField({
+    required this.icon,
+    required this.hintText,
+    this.isPassword = false,
+    required this.controller,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -444,7 +461,7 @@ class InputField extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(10), // Add padding to the icon container
+            padding: EdgeInsets.all(10),
             child: Icon(icon, color: Colors.white),
           ),
           SizedBox(width: 10),
@@ -462,6 +479,7 @@ class InputField extends StatelessWidget {
                   hintText: hintText,
                   hintStyle: TextStyle(color: Colors.black),
                   border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10), // Adjust the horizontal padding
                 ),
               ),
             ),
@@ -471,6 +489,3 @@ class InputField extends StatelessWidget {
     );
   }
 }
-
-
-

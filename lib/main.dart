@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:permission_handler/permission_handler.dart'; // Add this line
+import 'package:get_storage/get_storage.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'screens/Loginpage.dart';
 import 'screens/landing_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Ensure that widgets are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  await GetStorage.init();
 
-  // Request location permission
   var status = await Permission.location.request();
 
-  runApp(SmartHCMApp());
+  await SharedPreferences.getInstance().then((prefs) {
+    String? token = prefs.getString('token');
+    runApp(SmartHCMApp(token));
+  });
 }
 
 class SmartHCMApp extends StatelessWidget {
+  final String? token;
+
+  SmartHCMApp(this.token);
+
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
@@ -21,8 +30,8 @@ class SmartHCMApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: Color.fromARGB(255, 1, 45, 56),
       ),
-      home: LoginPage(),
       debugShowCheckedModeBanner: false,
+      home: token != null ? LandingPage() : LoginPage(),
     );
   }
 }
